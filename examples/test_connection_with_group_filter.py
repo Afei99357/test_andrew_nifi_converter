@@ -2,8 +2,12 @@
 """
 Test NiFi Connection with Process Group Filtering
 
-This script is a modified version of provenance_to_python.py that filters
-provenance events to only include processors from a SPECIFIC process group.
+This script is a modified version of provenance_to_python.py that queries
+provenance events ONLY from processors in a SPECIFIC process group.
+
+Unlike the original approach which queries all events then filters,
+this script queries provenance PER PROCESSOR in the target group,
+ensuring events are found even when other process groups are more active.
 
 CONFIGURATION REQUIRED:
 =======================
@@ -31,15 +35,14 @@ EXPECTED OUTPUT:
     Phase 1: Connecting to NiFi...
     ✓ Connected successfully
 
-    Phase 2: Querying provenance repository...
-    ✓ Found 1234 provenance events
+    Phase 2: Getting processors from target process group...
+    ✓ Found 36 processors in target process group
 
-    Phase 2.5: Filtering events for target process group...
-    ✓ Found 8 processors in target process group
-    ✓ Filtered events: 1234 → 156
+    Phase 3: Querying provenance per processor...
+    ✓ Found 1234 provenance events from target group
 
-    Phase 3: Grouping events by processor...
-    ✓ Found 8 unique processors
+    Phase 4: Grouping events by processor...
+    ✓ Found 36 unique processors
 
     [... continues with code generation ...]
 """
@@ -93,78 +96,27 @@ def main():
     console.print("[green]✓[/green] Connected successfully")
 
     # ========================================================================
-    # PHASE 2: Query Provenance (with pagination)
+    # PHASE 2: Get Target Group Processors
     # ========================================================================
-    console.print(f"\n[yellow]Phase 2:[/yellow] Querying provenance repository (max {max_events} events)...")
-
-    try:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            task = progress.add_task("Fetching provenance events...", total=None)
-            events = client.query_provenance(max_events=max_events)
-            progress.update(task, completed=True)
-
-        console.print(f"[green]✓[/green] Found {len(events)} provenance events")
-    except Exception as e:
-        console.print(f"[red]✗[/red] Provenance query failed: {e}")
-        console.print("\n[yellow]Note:[/yellow] Make sure processors are running in NiFi")
-        client.close()
-        return
-
-    if not events:
-        console.print("\n[yellow]No provenance events found.[/yellow]")
-        console.print("Please start some processors in NiFi and wait a few minutes.")
-        client.close()
-        return
-
-    # ========================================================================
-    # PHASE 2.5: Filter Events by Process Group
-    # ========================================================================
-    console.print(f"\n[yellow]Phase 2.5:[/yellow] Filtering events for target process group...")
+    console.print(f"\n[yellow]Phase 2:[/yellow] Getting processors from target process group...")
     console.print(f"[cyan]Target Process Group ID:[/cyan] {TARGET_GROUP_ID}")
 
-    # Get all processors in the target process group
     try:
         target_processors = client.list_processors(TARGET_GROUP_ID)
-        target_processor_ids = {p['id'] for p in target_processors}
-        console.print(f"[green]✓[/green] Found {len(target_processor_ids)} processors in target process group")
+        console.print(f"[green]✓[/green] Found {len(target_processors)} processors in target process group")
 
         # Display processor list
         if target_processors:
             console.print("\n[cyan]Processors in target group:[/cyan]")
-            for proc in target_processors[:10]:  # Show first 10
+            for proc in target_processors[:10]:
                 proc_name = proc['component']['name']
                 proc_type = proc['component']['type'].split('.')[-1]
                 console.print(f"  • {proc_name} ({proc_type})")
             if len(target_processors) > 10:
                 console.print(f"  ... and {len(target_processors) - 10} more")
 
-        # Filter events to only include target group processors
-        original_count = len(events)
-        events = [e for e in events if e.get('componentId') in target_processor_ids]
-        filtered_count = len(events)
-
-        console.print(f"\n[green]✓[/green] Filtered events: {original_count} → {filtered_count}")
-        console.print(f"[cyan]Kept events from {len(target_processor_ids)} processors in target group[/cyan]")
-
-        if not events:
-            console.print("\n[yellow]⚠ No provenance events found for target process group.[/yellow]")
-            console.print("Possible reasons:")
-            console.print("  1. Processors in this group haven't run recently")
-            console.print("  2. Process Group ID might be incorrect")
-            console.print(f"\nTip: Check that '{TARGET_GROUP_ID}' is correct")
-            console.print("\nHow to verify your Process Group ID:")
-            console.print("  1. Open NiFi UI")
-            console.print("  2. Right-click your process group → Enter")
-            console.print("  3. Check URL: ...?processGroupId=YOUR-ID-HERE")
-            client.close()
-            return
-
     except Exception as e:
-        console.print(f"[red]✗[/red] Failed to get processors for group {TARGET_GROUP_ID}: {e}")
+        console.print(f"[red]✗[/red] Failed to get processors: {e}")
         console.print("\n[yellow]Possible issues:[/yellow]")
         console.print("  1. Process Group ID might be incorrect")
         console.print("  2. You may not have permissions to access this group")
@@ -176,9 +128,58 @@ def main():
         return
 
     # ========================================================================
-    # PHASE 3: Group Events by Processor
+    # PHASE 3: Query Provenance Per Processor
     # ========================================================================
-    console.print("\n[yellow]Phase 3:[/yellow] Grouping events by processor...")
+    console.print(f"\n[yellow]Phase 3:[/yellow] Querying provenance per processor...")
+
+    all_events = []
+    events_per_processor = max_events // len(target_processors) if target_processors else 1000
+    events_per_processor = max(100, events_per_processor)  # At least 100 per processor
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task(
+            f"Fetching provenance for {len(target_processors)} processors...",
+            total=len(target_processors)
+        )
+
+        for proc in target_processors:
+            processor_id = proc['id']
+            proc_name = proc['component']['name']
+
+            try:
+                # Query THIS processor's events specifically
+                events = client.query_provenance(
+                    processor_id=processor_id,
+                    max_events=events_per_processor
+                )
+                all_events.extend(events)
+                progress.advance(task)
+            except Exception as e:
+                console.print(f"[yellow]⚠[/yellow]  Failed for {proc_name}: {e}")
+                progress.advance(task)
+
+    console.print(f"[green]✓[/green] Found {len(all_events)} provenance events from target group")
+
+    if not all_events:
+        console.print("\n[yellow]⚠ No provenance events found.[/yellow]")
+        console.print("Possible reasons:")
+        console.print("  1. Processors in this group haven't run recently")
+        console.print("  2. Provenance may be disabled for these processors")
+        console.print("\nTip: Check NiFi UI → Processor Settings → Properties → Provenance")
+        client.close()
+        return
+
+    # Continue with all_events (now from target group only)
+    events = all_events
+
+    # ========================================================================
+    # PHASE 4: Group Events by Processor
+    # ========================================================================
+    console.print("\n[yellow]Phase 4:[/yellow] Grouping events by processor...")
 
     events_by_processor = defaultdict(list)
     for event in events:
@@ -208,9 +209,9 @@ def main():
     console.print(table)
 
     # ========================================================================
-    # PHASE 4: Fetch Processor Configurations
+    # PHASE 5: Fetch Processor Configurations
     # ========================================================================
-    console.print("\n[yellow]Phase 4:[/yellow] Fetching processor configurations...")
+    console.print("\n[yellow]Phase 5:[/yellow] Fetching processor configurations...")
 
     processor_configs = {}
     failed_processors = []
@@ -239,9 +240,9 @@ def main():
         console.print(f"[yellow]⚠[/yellow]  {len(failed_processors)} processors failed (may be deleted)")
 
     # ========================================================================
-    # PHASE 5: Generate Python Code
+    # PHASE 6: Generate Python Code
     # ========================================================================
-    console.print("\n[yellow]Phase 5:[/yellow] Generating Python code from provenance...")
+    console.print("\n[yellow]Phase 6:[/yellow] Generating Python code from provenance...")
 
     # Generate code for each processor
     generated_code = []
@@ -314,9 +315,9 @@ def main():
                 progress.advance(task)
 
     # ========================================================================
-    # PHASE 5.5: Generate Workflow Execution from Lineage
+    # PHASE 6.5: Generate Workflow Execution from Lineage
     # ========================================================================
-    console.print("\n[yellow]Phase 5.5:[/yellow] Analyzing FlowFile lineage...")
+    console.print("\n[yellow]Phase 6.5:[/yellow] Analyzing FlowFile lineage...")
 
     # Create lineage tracer
     tracer = LineageTracer(events)
@@ -394,9 +395,9 @@ def main():
         generated_code.append("")
 
     # ========================================================================
-    # PHASE 6: Save Results
+    # PHASE 7: Save Results
     # ========================================================================
-    console.print("\n[yellow]Phase 6:[/yellow] Saving results...")
+    console.print("\n[yellow]Phase 7:[/yellow] Saving results...")
 
     # Save generated Python code (with process group ID in filename)
     output_file = Path(f"generated_from_group_{TARGET_GROUP_ID[:8]}.py")
