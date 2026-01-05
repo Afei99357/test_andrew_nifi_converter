@@ -467,19 +467,20 @@ class NiFiClient:
             }
         }
 
-        # Add search terms
+        # Add dates DIRECTLY to request (NOT in searchTerms!)
+        # NiFi API expects: "MM/DD/YYYY HH:MM:SS TIMEZONE"
+        if start_date:
+            query_request["provenance"]["request"]["startDate"] = start_date.strftime("%m/%d/%Y %H:%M:%S UTC")
+
+        if end_date:
+            query_request["provenance"]["request"]["endDate"] = end_date.strftime("%m/%d/%Y %H:%M:%S UTC")
+
+        # Add search terms (WITHOUT dates - only processor_id, etc.)
         search_terms = {}
         if processor_id:
             search_terms["ProcessorID"] = processor_id
 
-        if start_date:
-            # Use ISO 8601 format without microseconds (NiFi requirement)
-            search_terms["StartDate"] = start_date.replace(microsecond=0).isoformat()
-
-        if end_date:
-            # Use ISO 8601 format without microseconds (NiFi requirement)
-            search_terms["EndDate"] = end_date.replace(microsecond=0).isoformat()
-
+        # Only add searchTerms if there are non-date filters
         if search_terms:
             query_request["provenance"]["request"]["searchTerms"] = search_terms
 
