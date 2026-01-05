@@ -78,8 +78,9 @@ def main():
     TARGET_GROUP_ID = "REPLACE_WITH_YOUR_PROCESS_GROUP_ID"  # e.g., "abc-123-def-456"
 
     # Provenance settings
-    max_events = 5000  # Paginate to collect up to 5000 events
+    max_events = 360  # Paginate to collect up to 360 events
     sample_size = 20   # Number of provenance samples per processor
+    test_limit = 3  # TEST: Only query first 3 processors (for debugging)
 
     # ========================================================================
     # PHASE 1: Connect to NiFi
@@ -136,26 +137,32 @@ def main():
     events_per_processor = max_events // len(target_processors) if target_processors else 1000
     events_per_processor = max(100, events_per_processor)  # At least 100 per processor
 
+    # TEST: Limit number of processors for debugging
+    processors_to_query = target_processors[:test_limit] if test_limit else target_processors
+    console.print(f"[cyan]Testing with first {len(processors_to_query)} processors...[/cyan]")
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console
     ) as progress:
         task = progress.add_task(
-            f"Fetching provenance for {len(target_processors)} processors...",
-            total=len(target_processors)
+            f"Fetching provenance for {len(processors_to_query)} processors...",
+            total=len(processors_to_query)
         )
 
-        for proc in target_processors:
+        for proc in processors_to_query:
             processor_id = proc['id']
             proc_name = proc['component']['name']
 
             try:
+                console.print(f"[cyan]→[/cyan] Querying {proc_name}...")
                 # Query THIS processor's events specifically
                 events = client.query_provenance(
                     processor_id=processor_id,
                     max_events=events_per_processor
                 )
+                console.print(f"[green]✓[/green] {proc_name}: Found {len(events)} events")
                 all_events.extend(events)
                 progress.advance(task)
             except Exception as e:
