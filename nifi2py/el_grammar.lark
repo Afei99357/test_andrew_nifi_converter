@@ -1,0 +1,125 @@
+// Lark Grammar for NiFi Expression Language
+// Based on Apache NiFi AttributeExpression.g (ANTLR3)
+
+?start: expression
+
+// Main expression structure
+expression: DOLLAR LBRACE subject (COLON function_call)* RBRACE
+
+// Subject can be attribute name, string literal, or standalone function
+?subject: standalone_function
+        | attribute_ref
+
+// Attribute reference (can be quoted for special chars)
+attribute_ref: ATTRIBUTE_NAME
+             | STRING_LITERAL
+             | expression  // Nested expression like ${${x}}
+
+// Standalone functions (no subject required)
+standalone_function: "UUID" LPAREN RPAREN                -> uuid_func
+                   | "now" LPAREN RPAREN                 -> now_func
+                   | "literal" LPAREN arg RPAREN         -> literal_func
+
+// Function calls (require subject)
+?function_call: string_func
+              | boolean_func
+              | numeric_func
+              | date_func
+              | special_func
+
+// String functions (0-2 args)
+string_func: "toUpper" LPAREN RPAREN                                -> to_upper
+           | "toLower" LPAREN RPAREN                                -> to_lower
+           | "trim" LPAREN RPAREN                                   -> trim
+           | "substring" LPAREN arg COMMA arg RPAREN                -> substring
+           | "substringBefore" LPAREN arg RPAREN                    -> substring_before
+           | "substringAfter" LPAREN arg RPAREN                     -> substring_after
+           | "substringBeforeLast" LPAREN arg RPAREN                -> substring_before_last
+           | "substringAfterLast" LPAREN arg RPAREN                 -> substring_after_last
+           | "append" LPAREN arg RPAREN                             -> append
+           | "prepend" LPAREN arg RPAREN                            -> prepend
+           | "replace" LPAREN arg COMMA arg RPAREN                  -> replace
+           | "replaceAll" LPAREN arg COMMA arg RPAREN               -> replace_all
+           | "replaceFirst" LPAREN arg COMMA arg RPAREN             -> replace_first
+           | "replaceNull" LPAREN arg RPAREN                        -> replace_null
+           | "replaceEmpty" LPAREN arg RPAREN                       -> replace_empty
+           | "indexOf" LPAREN arg RPAREN                            -> index_of
+           | "lastIndexOf" LPAREN arg RPAREN                        -> last_index_of
+           | "padLeft" LPAREN arg COMMA arg RPAREN                  -> pad_left
+           | "padRight" LPAREN arg COMMA arg RPAREN                 -> pad_right
+           | "evaluateELString" LPAREN RPAREN                       -> evaluate_el_string
+
+// Boolean functions
+boolean_func: "isEmpty" LPAREN RPAREN                               -> is_empty
+            | "isNull" LPAREN RPAREN                                -> is_null
+            | "notNull" LPAREN RPAREN                               -> not_null
+            | "equals" LPAREN arg RPAREN                            -> equals
+            | "equalsIgnoreCase" LPAREN arg RPAREN                  -> equals_ignore_case
+            | "startsWith" LPAREN arg RPAREN                        -> starts_with
+            | "endsWith" LPAREN arg RPAREN                          -> ends_with
+            | "contains" LPAREN arg RPAREN                          -> contains
+            | "matches" LPAREN arg RPAREN                           -> matches
+            | "find" LPAREN arg RPAREN                              -> find
+            | "and" LPAREN arg RPAREN                               -> and_op
+            | "or" LPAREN arg RPAREN                                -> or_op
+            | "not" LPAREN RPAREN                                   -> not_op
+            | "ifElse" LPAREN arg COMMA arg RPAREN                  -> if_else
+            | "in" LPAREN arg (COMMA arg)* RPAREN                   -> in_op
+
+// Numeric functions
+numeric_func: "length" LPAREN RPAREN                                -> length
+            | "toNumber" LPAREN RPAREN                              -> to_number
+            | "toDecimal" LPAREN RPAREN                             -> to_decimal
+            | "plus" LPAREN arg RPAREN                              -> plus
+            | "minus" LPAREN arg RPAREN                             -> minus
+            | "multiply" LPAREN arg RPAREN                          -> multiply
+            | "divide" LPAREN arg RPAREN                            -> divide
+            | "mod" LPAREN arg RPAREN                               -> mod
+            | "gt" LPAREN arg RPAREN                                -> gt
+            | "lt" LPAREN arg RPAREN                                -> lt
+            | "ge" LPAREN arg RPAREN                                -> ge
+            | "le" LPAREN arg RPAREN                                -> le
+            | "math" LPAREN arg RPAREN                              -> math_func
+
+// Date functions
+date_func: "format" LPAREN arg RPAREN                               -> format_date
+         | "toDate" LPAREN RPAREN                                   -> to_date_no_args
+         | "toDate" LPAREN arg (COMMA arg)? RPAREN                  -> to_date
+
+// Special multi-value functions
+special_func: "allAttributes" LPAREN arg (COMMA arg)* RPAREN        -> all_attributes
+            | "allMatchingAttributes" LPAREN arg RPAREN             -> all_matching_attributes
+            | "join" LPAREN arg RPAREN                              -> join
+            | "count" LPAREN RPAREN                                 -> count
+
+// Arguments can be literals or nested expressions
+?arg: NUMBER          -> number_arg
+    | STRING_LITERAL  -> string_arg
+    | BOOLEAN         -> boolean_arg
+    | expression      -> expression_arg
+
+// Terminals
+DOLLAR: "$"
+LBRACE: "{"
+RBRACE: "}"
+LPAREN: "("
+RPAREN: ")"
+COLON: ":"
+COMMA: ","
+
+// String literals support escape sequences
+STRING_LITERAL: /"(?:[^"\\]|\\["\\ntr])*"/
+              | /'(?:[^'\\]|\\['\\ntr])*'/
+
+// Attribute names can contain letters, digits, underscores, hyphens, dots
+ATTRIBUTE_NAME: /[a-zA-Z_][a-zA-Z0-9_.\-]*/
+
+// Numeric literals
+NUMBER: /-?\d+(\.\d+)?([eE][+-]?\d+)?/
+
+// Boolean literals
+BOOLEAN: "true" | "false"
+
+// Ignore whitespace
+%import common.WS
+%ignore WS

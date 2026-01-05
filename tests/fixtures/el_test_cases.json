@@ -1,0 +1,919 @@
+{
+  "metadata": {
+    "source": "Apache NiFi TestQuery.java",
+    "source_file": "/nifi-commons/nifi-expression-language/src/test/java/org/apache/nifi/attribute/expression/language/TestQuery.java",
+    "total_test_cases": 75,
+    "categories": [
+      "string_functions",
+      "boolean_functions",
+      "numeric_functions",
+      "date_functions",
+      "embedded_expressions",
+      "edge_cases"
+    ]
+  },
+  "test_cases": [
+    {
+      "id": 1,
+      "category": "string_functions",
+      "description": "Simple attribute access",
+      "nifi_expression": "${attr}",
+      "attributes": {
+        "attr": "My Value"
+      },
+      "expected_result": "My Value",
+      "source_line": 753
+    },
+    {
+      "id": 2,
+      "category": "string_functions",
+      "description": "Simple substring",
+      "nifi_expression": "${attr:substring(2, 5)}",
+      "attributes": {
+        "attr": "My Value"
+      },
+      "expected_result": " Va",
+      "source_line": 768
+    },
+    {
+      "id": 3,
+      "category": "string_functions",
+      "description": "Method chaining: trim then substring",
+      "nifi_expression": "${attr:trim():substring(2, 5)}",
+      "attributes": {
+        "attr": "   My Value   "
+      },
+      "expected_result": " Va",
+      "source_line": 775
+    },
+    {
+      "id": 4,
+      "category": "string_functions",
+      "description": "toUpper function",
+      "nifi_expression": "${attr:toUpper()}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "HELLO",
+      "notes": "Direct mapping to Python .upper()"
+    },
+    {
+      "id": 5,
+      "category": "string_functions",
+      "description": "toLower function",
+      "nifi_expression": "${attr:toLower()}",
+      "attributes": {
+        "attr": "HELLO"
+      },
+      "expected_result": "hello",
+      "notes": "Direct mapping to Python .lower()"
+    },
+    {
+      "id": 6,
+      "category": "string_functions",
+      "description": "trim function",
+      "nifi_expression": "${attr:trim()}",
+      "attributes": {
+        "attr": "  hello  "
+      },
+      "expected_result": "hello",
+      "notes": "Direct mapping to Python .strip()"
+    },
+    {
+      "id": 7,
+      "category": "string_functions",
+      "description": "substringBefore with backslash",
+      "nifi_expression": "${x:substringAfterLast('/'):substringAfterLast('\\\\')}",
+      "attributes": {
+        "x": "C:\\test\\1.txt"
+      },
+      "expected_result": "1.txt",
+      "source_line": 279,
+      "notes": "Handle backslash escaping"
+    },
+    {
+      "id": 8,
+      "category": "string_functions",
+      "description": "substringBefore with path separators",
+      "nifi_expression": "${x:substringAfterLast('/'):substringAfterLast('\\\\')}",
+      "attributes": {
+        "x": "C:/test/1.txt"
+      },
+      "expected_result": "1.txt",
+      "source_line": 282
+    },
+    {
+      "id": 9,
+      "category": "string_functions",
+      "description": "append function",
+      "nifi_expression": "${attr:append('X')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "helloX",
+      "notes": "String concatenation"
+    },
+    {
+      "id": 10,
+      "category": "string_functions",
+      "description": "prepend function",
+      "nifi_expression": "${attr:prepend('X')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "Xhello",
+      "notes": "String concatenation"
+    },
+    {
+      "id": 11,
+      "category": "string_functions",
+      "description": "Append and prepend chaining",
+      "nifi_expression": "${attr:append('X'):prepend('Y')}",
+      "attributes": {
+        "attr": "XX"
+      },
+      "expected_result": "YXXX",
+      "source_line": 1092,
+      "notes": "Chain append then prepend"
+    },
+    {
+      "id": 12,
+      "category": "string_functions",
+      "description": "replace function",
+      "nifi_expression": "${attr:replace('hell', 'yell')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "yello",
+      "source_line": 1132
+    },
+    {
+      "id": 13,
+      "category": "string_functions",
+      "description": "replaceAll with regex",
+      "nifi_expression": "${attr:replaceAll('l+', 'r')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "hero",
+      "source_line": 1142
+    },
+    {
+      "id": 14,
+      "category": "string_functions",
+      "description": "replaceAll with capture groups",
+      "nifi_expression": "${xyz:replaceAll(\"^([^.]+)\\\\.([0-9]{4})_([0-9]{2})_([0-9]{2}).*$\", \"$3\")}",
+      "attributes": {
+        "xyz": "00-00TEST.2014_01_01_000000_value"
+      },
+      "expected_result": "01",
+      "source_line": 1141
+    },
+    {
+      "id": 15,
+      "category": "string_functions",
+      "description": "replaceAll with matching group",
+      "nifi_expression": "${attr:replaceAll('.*?(l+).*', '$1')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "ll",
+      "source_line": 1180
+    },
+    {
+      "id": 16,
+      "category": "string_functions",
+      "description": "indexOf function",
+      "nifi_expression": "${attr:indexOf('/')}",
+      "attributes": {
+        "attr": "https://abc.go"
+      },
+      "expected_result": "6",
+      "source_line": 1386,
+      "result_type": "number"
+    },
+    {
+      "id": 17,
+      "category": "boolean_functions",
+      "description": "equals function",
+      "nifi_expression": "${attr:trim():equals('XX')}",
+      "attributes": {
+        "attr": " XX    "
+      },
+      "expected_result": "true",
+      "source_line": 789,
+      "result_type": "boolean"
+    },
+    {
+      "id": 18,
+      "category": "boolean_functions",
+      "description": "isEmpty on empty string",
+      "nifi_expression": "${b:isEmpty()}",
+      "attributes": {
+        "a": "a",
+        "b": ""
+      },
+      "expected_result": "true",
+      "source_line": 694,
+      "result_type": "boolean"
+    },
+    {
+      "id": 19,
+      "category": "boolean_functions",
+      "description": "isEmpty on whitespace",
+      "nifi_expression": "${c:isEmpty()}",
+      "attributes": {
+        "c": "        \\n"
+      },
+      "expected_result": "true",
+      "source_line": 695,
+      "result_type": "boolean"
+    },
+    {
+      "id": 20,
+      "category": "boolean_functions",
+      "description": "isEmpty on non-empty string",
+      "nifi_expression": "${a:isEmpty()}",
+      "attributes": {
+        "a": "a"
+      },
+      "expected_result": "false",
+      "source_line": 693,
+      "result_type": "boolean"
+    },
+    {
+      "id": 21,
+      "category": "boolean_functions",
+      "description": "isEmpty on missing attribute",
+      "nifi_expression": "${d:isEmpty()}",
+      "attributes": {},
+      "expected_result": "true",
+      "source_line": 696,
+      "result_type": "boolean"
+    },
+    {
+      "id": 22,
+      "category": "boolean_functions",
+      "description": "isNull on missing attribute",
+      "nifi_expression": "${attr:isNull()}",
+      "attributes": {},
+      "expected_result": "true",
+      "source_line": 1098,
+      "result_type": "boolean"
+    },
+    {
+      "id": 23,
+      "category": "boolean_functions",
+      "description": "notNull on empty string",
+      "nifi_expression": "${attr:notNull()}",
+      "attributes": {
+        "attr": ""
+      },
+      "expected_result": "true",
+      "source_line": 1106,
+      "result_type": "boolean"
+    },
+    {
+      "id": 24,
+      "category": "boolean_functions",
+      "description": "startsWith returns true",
+      "nifi_expression": "${attr:startsWith('hel')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "true",
+      "result_type": "boolean"
+    },
+    {
+      "id": 25,
+      "category": "boolean_functions",
+      "description": "endsWith returns true",
+      "nifi_expression": "${attr:endsWith('lo')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "true",
+      "result_type": "boolean"
+    },
+    {
+      "id": 26,
+      "category": "boolean_functions",
+      "description": "contains returns true",
+      "nifi_expression": "${attr:contains('ell')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "true",
+      "result_type": "boolean"
+    },
+    {
+      "id": 27,
+      "category": "string_functions",
+      "description": "replaceNull with missing attribute",
+      "nifi_expression": "${attr:replaceNull('hello')}",
+      "attributes": {},
+      "expected_result": "hello",
+      "source_line": 1125
+    },
+    {
+      "id": 28,
+      "category": "string_functions",
+      "description": "replaceEmpty with empty string",
+      "nifi_expression": "${b:replaceEmpty('c')}",
+      "attributes": {
+        "a": "a",
+        "b": ""
+      },
+      "expected_result": "c",
+      "source_line": 707
+    },
+    {
+      "id": 29,
+      "category": "string_functions",
+      "description": "replaceEmpty with non-empty string",
+      "nifi_expression": "${a:replaceEmpty('c')}",
+      "attributes": {
+        "a": "a",
+        "b": ""
+      },
+      "expected_result": "a",
+      "source_line": 706
+    },
+    {
+      "id": 30,
+      "category": "numeric_functions",
+      "description": "length function",
+      "nifi_expression": "${attr:length()}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "5",
+      "result_type": "number"
+    },
+    {
+      "id": 31,
+      "category": "numeric_functions",
+      "description": "plus with string coercion",
+      "nifi_expression": "${A:plus(4)}",
+      "attributes": {
+        "A": "0123456789"
+      },
+      "expected_result": "123456793",
+      "source_line": 1033,
+      "result_type": "number"
+    },
+    {
+      "id": 32,
+      "category": "numeric_functions",
+      "description": "Complex math chain",
+      "nifi_expression": "${hundred:toNumber():multiply(${two}):divide(${three}):plus(${one}):mod(${five})}",
+      "attributes": {
+        "one": "1",
+        "two": "2",
+        "three": "3",
+        "four": "4",
+        "five": "5",
+        "hundred": "100"
+      },
+      "expected_result": "2",
+      "source_line": 1289,
+      "result_type": "number"
+    },
+    {
+      "id": 33,
+      "category": "date_functions",
+      "description": "Date formatting",
+      "nifi_expression": "${entryDate:toNumber():toDate():format('yyyy')}",
+      "attributes": {
+        "entryDate": "1609459200000"
+      },
+      "expected_result": "2021",
+      "source_line": 1396,
+      "notes": "Timestamp is Jan 1, 2021 00:00:00 UTC"
+    },
+    {
+      "id": 34,
+      "category": "date_functions",
+      "description": "Date parsing and formatting",
+      "nifi_expression": "${year:append('/'):append(${month}):append('/'):append(${day}):toDate('yyyy/MM/dd'):format('D')}",
+      "attributes": {
+        "month": "3",
+        "day": "4",
+        "year": "2013"
+      },
+      "expected_result": "63",
+      "source_line": 1405,
+      "notes": "Day 63 of year 2013"
+    },
+    {
+      "id": 35,
+      "category": "embedded_expressions",
+      "description": "Equals with embedded expression",
+      "nifi_expression": "${x:equals(${y})}",
+      "attributes": {
+        "x": "hello",
+        "y": "hello"
+      },
+      "expected_result": "true",
+      "source_line": 888,
+      "result_type": "boolean"
+    },
+    {
+      "id": 36,
+      "category": "embedded_expressions",
+      "description": "Complex embedded expression",
+      "nifi_expression": "${x:toNumber():lt(${y:toNumber():plus(${h:toNumber()})})}",
+      "attributes": {
+        "x": "4",
+        "y": "3",
+        "h": "100"
+      },
+      "expected_result": "true",
+      "source_line": 894,
+      "result_type": "boolean"
+    },
+    {
+      "id": 37,
+      "category": "embedded_expressions",
+      "description": "Nested attribute reference",
+      "nifi_expression": "${${attr:trim()}}",
+      "attributes": {
+        "attr": "XX ",
+        "XX": "My Value"
+      },
+      "expected_result": "My Value",
+      "source_line": 761
+    },
+    {
+      "id": 38,
+      "category": "embedded_expressions",
+      "description": "Deeply nested with OR",
+      "nifi_expression": "${x:or(${${abc}:length():equals(1)})}",
+      "attributes": {
+        "x": "false",
+        "abc": "a",
+        "a": "a"
+      },
+      "expected_result": "true",
+      "source_line": 799,
+      "result_type": "boolean"
+    },
+    {
+      "id": 39,
+      "category": "embedded_expressions",
+      "description": "Substring with embedded length",
+      "nifi_expression": "${fox:substring(${'dog':substring(2):length()}, 5):equals('ick')}",
+      "attributes": {
+        "fox": "quick, brown",
+        "dog": "lazy"
+      },
+      "expected_result": "true",
+      "source_line": 911,
+      "result_type": "boolean"
+    },
+    {
+      "id": 40,
+      "category": "edge_cases",
+      "description": "Single letter attribute",
+      "nifi_expression": "${A}",
+      "attributes": {
+        "A": "0123456789"
+      },
+      "expected_result": "0123456789",
+      "source_line": 1008
+    },
+    {
+      "id": 41,
+      "category": "edge_cases",
+      "description": "Attribute with spaces (quoted)",
+      "nifi_expression": "${'a b c,d':equals('abc')}",
+      "attributes": {
+        "a b c,d": "abc"
+      },
+      "expected_result": "true",
+      "source_line": 1059,
+      "result_type": "boolean"
+    },
+    {
+      "id": 42,
+      "category": "edge_cases",
+      "description": "Empty attribute returns empty string",
+      "nifi_expression": "${missing}",
+      "attributes": {},
+      "expected_result": "",
+      "notes": "Null-safe behavior"
+    },
+    {
+      "id": 43,
+      "category": "edge_cases",
+      "description": "Chained operations on empty",
+      "nifi_expression": "${missing:toUpper():append('test')}",
+      "attributes": {},
+      "expected_result": "test",
+      "notes": "Empty string toUpper is empty, then append"
+    },
+    {
+      "id": 44,
+      "category": "boolean_functions",
+      "description": "ifElse with true condition",
+      "nifi_expression": "${cond:equals('true'):ifElse('yes', 'no')}",
+      "attributes": {
+        "cond": "true"
+      },
+      "expected_result": "yes"
+    },
+    {
+      "id": 45,
+      "category": "boolean_functions",
+      "description": "ifElse with false condition",
+      "nifi_expression": "${cond:equals('true'):ifElse('yes', 'no')}",
+      "attributes": {
+        "cond": "false"
+      },
+      "expected_result": "no"
+    },
+    {
+      "id": 46,
+      "category": "string_functions",
+      "description": "Escape quotes in replace",
+      "nifi_expression": "${xx:replace(\"'\", '\\\"')}",
+      "attributes": {
+        "xx": "say 'hi'"
+      },
+      "expected_result": "say \\\"hi\\\"",
+      "source_line": 923
+    },
+    {
+      "id": 47,
+      "category": "numeric_functions",
+      "description": "Comparison gt (greater than)",
+      "nifi_expression": "${x:toNumber():gt(${y:toNumber():plus(${z:toNumber()})})}",
+      "attributes": {
+        "x": "88",
+        "y": "3",
+        "z": "1"
+      },
+      "expected_result": "true",
+      "source_line": 899,
+      "result_type": "boolean"
+    },
+    {
+      "id": 48,
+      "category": "numeric_functions",
+      "description": "Comparison ge (greater or equal)",
+      "nifi_expression": "${h:toNumber():ge(${y:toNumber():plus(${z:toNumber()})})}",
+      "attributes": {
+        "h": "100",
+        "y": "3",
+        "z": "1"
+      },
+      "expected_result": "true",
+      "source_line": 895,
+      "result_type": "boolean"
+    },
+    {
+      "id": 49,
+      "category": "numeric_functions",
+      "description": "Comparison lt (less than)",
+      "nifi_expression": "${F:lt(${A})}",
+      "attributes": {
+        "F": "-48",
+        "A": "0123456789"
+      },
+      "expected_result": "true",
+      "source_line": 1036,
+      "result_type": "boolean"
+    },
+    {
+      "id": 50,
+      "category": "string_functions",
+      "description": "substringBefore returns original if not found",
+      "nifi_expression": "${attr:substringBefore('xyz')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "hello",
+      "notes": "NiFi returns whole string if delimiter not found"
+    },
+    {
+      "id": 51,
+      "category": "string_functions",
+      "description": "substringAfter returns original if not found",
+      "nifi_expression": "${attr:substringAfter('xyz')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "hello",
+      "notes": "NiFi returns whole string if delimiter not found"
+    },
+    {
+      "id": 52,
+      "category": "string_functions",
+      "description": "substringBefore with empty delimiter",
+      "nifi_expression": "${attr:substringBefore('')}",
+      "attributes": {
+        "attr": "hello"
+      },
+      "expected_result": "hello",
+      "notes": "Empty delimiter returns original"
+    },
+    {
+      "id": 53,
+      "category": "string_functions",
+      "description": "Complex filename parsing",
+      "nifi_expression": "${filename1:replaceAll('\\\\.gz$', '')}",
+      "attributes": {
+        "filename1": "abc.gz"
+      },
+      "expected_result": "abc",
+      "source_line": 1153
+    },
+    {
+      "id": 54,
+      "category": "string_functions",
+      "description": "Filename with multiple extensions",
+      "nifi_expression": "${filename3:replaceAll('\\\\.gz$', '')}",
+      "attributes": {
+        "filename3": "abc.gz.gz"
+      },
+      "expected_result": "abc.gz",
+      "source_line": 1152,
+      "notes": "Only removes last .gz"
+    },
+    {
+      "id": 55,
+      "category": "embedded_expressions",
+      "description": "Plus with embedded expression",
+      "nifi_expression": "${A:plus(${F})}",
+      "attributes": {
+        "A": "0123456789",
+        "F": "-48"
+      },
+      "expected_result": "123456741",
+      "source_line": 1034,
+      "result_type": "number"
+    },
+    {
+      "id": 56,
+      "category": "numeric_functions",
+      "description": "Substring result to number and add",
+      "nifi_expression": "${A:substring(2,3):plus(21):substring(1,2):plus(0)}",
+      "attributes": {
+        "A": "0123456789"
+      },
+      "expected_result": "3",
+      "source_line": 1037,
+      "result_type": "number"
+    },
+    {
+      "id": 57,
+      "category": "boolean_functions",
+      "description": "Equals with newline in value",
+      "nifi_expression": "${y:equals('y\\\\ny')}",
+      "attributes": {
+        "y": "y\\ny"
+      },
+      "expected_result": "true",
+      "source_line": 284,
+      "result_type": "boolean"
+    },
+    {
+      "id": 58,
+      "category": "string_functions",
+      "description": "evaluateELString nested evaluation",
+      "nifi_expression": "${sql.query:evaluateELString()}",
+      "attributes": {
+        "id": "1234",
+        "sql.query": "SELECT * FROM table WHERE ID = ${id}"
+      },
+      "expected_result": "SELECT * FROM table WHERE ID = 1234",
+      "source_line": 184,
+      "notes": "Evaluates EL within the attribute value"
+    },
+    {
+      "id": 59,
+      "category": "string_functions",
+      "description": "evaluateELString with method chain",
+      "nifi_expression": "${employee.name:evaluateELString():toUpper()}",
+      "attributes": {
+        "employee.name": "Harry Potter"
+      },
+      "expected_result": "HARRY POTTER",
+      "source_line": 186
+    },
+    {
+      "id": 60,
+      "category": "numeric_functions",
+      "description": "Math function abs",
+      "nifi_expression": "${negative:math('abs')}",
+      "attributes": {
+        "negative": "-64"
+      },
+      "expected_result": "64",
+      "source_line": 1358,
+      "result_type": "number"
+    },
+    {
+      "id": 61,
+      "category": "numeric_functions",
+      "description": "Decimal math operations",
+      "nifi_expression": "${hundred:toNumber():multiply(${second}):divide(${third}):plus(${first}):mod(${fifth})}",
+      "attributes": {
+        "first": "1.5",
+        "second": "12.3",
+        "third": "3",
+        "fourth": "4.201",
+        "fifth": "5.1",
+        "hundred": "100"
+      },
+      "expected_result": "4.999999999999993",
+      "source_line": 1303,
+      "result_type": "decimal",
+      "notes": "Floating point precision issue"
+    },
+    {
+      "id": 62,
+      "category": "numeric_functions",
+      "description": "literal function with math",
+      "nifi_expression": "${literal(5):toNumber():multiply(${two:plus(1)})}",
+      "attributes": {
+        "two": "2.2"
+      },
+      "expected_result": "16.0",
+      "source_line": 1378,
+      "result_type": "decimal"
+    },
+    {
+      "id": 63,
+      "category": "date_functions",
+      "description": "Add one day to date",
+      "nifi_expression": "${dateTime:toDate('yyyy/MM/dd HH:mm:ss.SSS'):plus(86400000):format('yyyy/MM/dd HH:mm:ss.SSS')}",
+      "attributes": {
+        "dateTime": "2013/11/18 10:22:27.678"
+      },
+      "expected_result": "2013/11/19 10:22:27.678",
+      "source_line": 367,
+      "notes": "86400000 ms = 1 day"
+    },
+    {
+      "id": 64,
+      "category": "string_functions",
+      "description": "Curly braces in regex",
+      "nifi_expression": "${attr:replaceAll('My (Val)ue{1,2}', '$1')}",
+      "attributes": {
+        "attr": "My Valuee"
+      },
+      "expected_result": "Val",
+      "source_line": 732
+    },
+    {
+      "id": 65,
+      "category": "boolean_functions",
+      "description": "AND operation",
+      "nifi_expression": "${a:equals('yes'):and(${b:equals('yes')})}",
+      "attributes": {
+        "a": "yes",
+        "b": "yes"
+      },
+      "expected_result": "true",
+      "result_type": "boolean"
+    },
+    {
+      "id": 66,
+      "category": "boolean_functions",
+      "description": "OR operation",
+      "nifi_expression": "${a:equals('yes'):or(${b:equals('yes')})}",
+      "attributes": {
+        "a": "no",
+        "b": "yes"
+      },
+      "expected_result": "true",
+      "result_type": "boolean"
+    },
+    {
+      "id": 67,
+      "category": "boolean_functions",
+      "description": "NOT operation",
+      "nifi_expression": "${a:equals('yes'):not()}",
+      "attributes": {
+        "a": "no"
+      },
+      "expected_result": "true",
+      "result_type": "boolean"
+    },
+    {
+      "id": 68,
+      "category": "string_functions",
+      "description": "padLeft function",
+      "nifi_expression": "${attr:padLeft(10, '#')}",
+      "attributes": {
+        "attr": "test"
+      },
+      "expected_result": "######test",
+      "notes": "Pad left to length 10 with #"
+    },
+    {
+      "id": 69,
+      "category": "string_functions",
+      "description": "padRight function",
+      "nifi_expression": "${attr:padRight(10, '#')}",
+      "attributes": {
+        "attr": "test"
+      },
+      "expected_result": "test######",
+      "notes": "Pad right to length 10 with #"
+    },
+    {
+      "id": 70,
+      "category": "string_functions",
+      "description": "Base case: filename extension removal",
+      "nifi_expression": "${filename:substringBeforeLast('.')}",
+      "attributes": {
+        "filename": "data.2024.01.15.csv"
+      },
+      "expected_result": "data.2024.01.15",
+      "notes": "Common use case in NiFi flows"
+    },
+    {
+      "id": 71,
+      "category": "string_functions",
+      "description": "Get file extension",
+      "nifi_expression": "${filename:substringAfterLast('.')}",
+      "attributes": {
+        "filename": "data.2024.01.15.csv"
+      },
+      "expected_result": "csv",
+      "notes": "Common use case in NiFi flows"
+    },
+    {
+      "id": 72,
+      "category": "numeric_functions",
+      "description": "Count function on multi-attributes",
+      "nifi_expression": "${allMatchingAttributes('n.*'):plus(1):count()}",
+      "attributes": {
+        "n1": "111",
+        "n2": "222",
+        "n3": "333333"
+      },
+      "expected_result": "3",
+      "source_line": 724,
+      "result_type": "number",
+      "notes": "Requires multi-attribute support"
+    },
+    {
+      "id": 73,
+      "category": "string_functions",
+      "description": "Join multiple attributes",
+      "nifi_expression": "${allAttributes('a.a', 'a.b', 'a.c'):join(', ')}",
+      "attributes": {
+        "a.a": "a",
+        "a.b": "b",
+        "a.c": "c"
+      },
+      "expected_result": "a, b, c",
+      "source_line": 675,
+      "notes": "Requires multi-attribute support"
+    },
+    {
+      "id": 74,
+      "category": "boolean_functions",
+      "description": "IN function with multiple values",
+      "nifi_expression": "${status:in('ACTIVE', 'PENDING', 'APPROVED')}",
+      "attributes": {
+        "status": "PENDING"
+      },
+      "expected_result": "true",
+      "result_type": "boolean",
+      "notes": "Membership test"
+    },
+    {
+      "id": 75,
+      "category": "boolean_functions",
+      "description": "IN function with no match",
+      "nifi_expression": "${status:in('ACTIVE', 'PENDING', 'APPROVED')}",
+      "attributes": {
+        "status": "REJECTED"
+      },
+      "expected_result": "false",
+      "result_type": "boolean",
+      "notes": "Membership test"
+    }
+  ],
+  "implementation_notes": {
+    "null_safety": "All transpiled code must handle missing attributes by returning empty string, not raising KeyError",
+    "type_coercion": "NiFi auto-converts strings to numbers when needed. Python must replicate this behavior.",
+    "method_chaining": "Functions are chained left-to-right. Each function takes the result of the previous as input.",
+    "escape_sequences": "String literals support \\n, \\t, \\r, \\\\, \\\", \\' escape sequences",
+    "regex_flavor": "NiFi uses Java regex. Python re module has minor differences (e.g., possessive quantifiers not supported)",
+    "date_precision": "NiFi uses milliseconds, Python datetime uses microseconds. Conversion required.",
+    "embedded_expressions": "Must be evaluated recursively from innermost to outermost"
+  },
+  "test_coverage_by_category": {
+    "string_functions": 31,
+    "boolean_functions": 15,
+    "numeric_functions": 13,
+    "date_functions": 4,
+    "embedded_expressions": 6,
+    "edge_cases": 6
+  }
+}
