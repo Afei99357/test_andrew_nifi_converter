@@ -98,14 +98,39 @@ if end_date:
 ```
 
 **Date format evolution:**
-- **Iteration 1:** `"01/06/2026 00:53:07"` ❌ NiFi rejects non-ISO format
-- **Iteration 2:** `"2026-01-06T01:03:20.728000"` ❌ NiFi rejects ISO with microseconds
-- **Iteration 3:** `"2026-01-06T01:03:20"` ✅ ISO 8601 without microseconds - WORKS!
+- **Iteration 1:** `"01/06/2026 00:53:07"` ❌ NiFi rejects - wrong format in searchTerms
+- **Iteration 2:** `"2026-01-06T01:03:20.728000"` ❌ NiFi rejects - wrong type in searchTerms
+- **Iteration 3:** `"2026-01-06T01:13:15"` ❌ NiFi rejects - wrong location (searchTerms vs request)
+- **Iteration 4 (FINAL):** `"01/06/2026 01:13:15 UTC"` ✅ Correct format in request object - WORKS!
+
+**The Real Issue:**
+Dates were being placed in `searchTerms` object, but NiFi API expects them **directly in the `request` object**!
+
+**Final Fix (Commit `46ce3a0`):**
+```python
+# CORRECT - Dates in request object, NOT searchTerms:
+query_request = {
+    "provenance": {
+        "request": {
+            "maxResults": max_results,
+            "startDate": "01/06/2026 01:13:15 UTC",  # ← Direct in request
+            "endDate": "01/06/2026 01:13:15 UTC",    # ← Direct in request
+            "searchTerms": {
+                "ProcessorID": "..."  # ← Only non-date filters here
+            }
+        }
+    }
+}
+```
 
 **Why this was needed:**
-- NiFi REST API expects dates in ISO 8601 format or epoch milliseconds
-- The MM/DD/YYYY format was causing deserialization errors
+- NiFi API documentation shows dates go in `request`, NOT in `searchTerms`
+- The `ProvenanceSearchValueDTO` class cannot deserialize date strings from searchTerms
+- Format: `MM/DD/YYYY HH:MM:SS TIMEZONE` (e.g., `"01/06/2026 01:13:15 UTC"`)
 - This affected pagination in provenance queries
+
+**API Reference:**
+- [Cloudera Community: NiFi Provenance REST API](https://community.cloudera.com/t5/Support-Questions/Apache-Nifi-How-to-use-REST-api-for-provenance-related/td-p/132733)
 
 **Impact:**
 - Provenance queries now work correctly
