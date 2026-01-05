@@ -473,12 +473,12 @@ class NiFiClient:
             search_terms["ProcessorID"] = processor_id
 
         if start_date:
-            # Use ISO 8601 format that NiFi can parse
-            search_terms["StartDate"] = start_date.isoformat()
+            # Use ISO 8601 format without microseconds (NiFi requirement)
+            search_terms["StartDate"] = start_date.replace(microsecond=0).isoformat()
 
         if end_date:
-            # Use ISO 8601 format that NiFi can parse
-            search_terms["EndDate"] = end_date.isoformat()
+            # Use ISO 8601 format without microseconds (NiFi requirement)
+            search_terms["EndDate"] = end_date.replace(microsecond=0).isoformat()
 
         if search_terms:
             query_request["provenance"]["request"]["searchTerms"] = search_terms
