@@ -52,7 +52,168 @@ python examples/test_connection_with_group_filter.py
 
 ---
 
-#### 2. Fixed Date Format Bug in Provenance Query
+#### 2. Fixed Process Group Filtering - Per-Processor Provenance Query
+**File:** `examples/test_connection_with_group_filter.py`
+**Branch:** `feature/per-processor-provenance-query`
+**Date:** 2026-01-05
+
+**Problem:**
+The initial implementation of process group filtering was fundamentally flawed:
+1. Queried ALL 5000 provenance events from entire NiFi instance
+2. Filtered them in Python to only keep target group events
+3. Result: 0 events when other process groups were more active
+
+**Root Cause:**
+NiFi provenance API does NOT support filtering by process group ID! The API can only filter by:
+- ✅ Processor ID (one at a time)
+- ✅ Date range
+- ✅ Event type
+- ❌ Process Group ID (NOT SUPPORTED)
+
+**Flawed Approach (BEFORE):**
+```python
+# Phase 2: Query ALL events from entire NiFi instance
+events = client.query_provenance(max_events=5000)  # Gets 5000 most recent from ANY group
+
+# Phase 2.5: Filter in Python
+target_processors = client.list_processors(TARGET_GROUP_ID)
+events = [e for e in events if e.get('componentId') in target_processor_ids]
+# Result: 0 events if target group didn't run recently
+```
+
+This fails when:
+- Other process groups are more active
+- Target group's events are older than 5000 most recent
+- Target group has sparse activity
+
+**Correct Approach (AFTER):**
+```python
+# Phase 2: Get processors in target group FIRST
+target_processors = client.list_processors(TARGET_GROUP_ID)
+
+# Phase 3: Query provenance PER PROCESSOR
+all_events = []
+events_per_processor = max_events // len(target_processors)  # Distribute quota
+
+for proc in target_processors:
+    processor_id = proc['id']
+    # Query THIS processor's events specifically
+    events = client.query_provenance(
+        processor_id=processor_id,  # ← Filter at API level!
+        max_events=events_per_processor
+    )
+    all_events.extend(events)
+
+# Result: Events specifically from target group processors
+```
+
+**What Changed:**
+- **Phase 2**: Now gets target group processors FIRST (instead of querying all events)
+- **Phase 3**: New phase - queries provenance per processor with API-level filtering
+- **Removed Phase 2.5**: No longer need Python filtering - API does it
+- **Updated phase numbers**: Subsequent phases renumbered (3→4, 4→5, 5→6, 5.5→6.5, 6→7)
+- **Updated documentation**: Docstring explains per-processor approach
+
+**Benefits:**
+1. ✅ Gets events from target group specifically - not affected by other groups
+2. ✅ More reliable - doesn't depend on target group being most active
+3. ✅ Better performance - NiFi filters at API level, not Python
+4. ✅ Handles sparse activity - gets events even if group ran days ago
+
+**Expected Output After Fix:**
+```
+Phase 1: Connecting to NiFi...
+✓ Connected successfully
+
+Phase 2: Getting processors from target process group...
+Target Process Group ID: f7f33d55-0389-1550-a325-b6af7f29d213
+✓ Found 36 processors in target process group
+
+Processors in target group:
+  • Update Site to ATTJ (UpdateAttribute)
+  • Get data_type and loaddate (UpdateAttribute)
+  ...
+
+Phase 3: Querying provenance per processor...
+⠼ Fetching provenance for 36 processors...
+✓ Found 1234 provenance events from target group
+
+Phase 4: Grouping events by processor...
+✓ Found 36 unique processors
+...
+```
+
+**Testing:**
+User can now successfully get provenance events from their specific process group even when:
+- Other process groups have run more recently
+- Target group has 36+ processors
+- Target group activity is sparse
+
+---
+
+#### 3. Fixed ProcessorID in Provenance Query (Per-Processor Filtering)
+**File:** `nifi2py/client.py` (lines 478-481)
+**Branch:** `feature/per-processor-provenance-query`
+**Date:** 2026-01-05
+
+**Problem:**
+When implementing per-processor provenance querying, ALL 36 processors failed with 400 error:
+```
+API request failed: 400 - Cannot construct instance of
+`org.apache.nifi.web.api.dto.provenance.ProvenanceSearchValueDTO`
+no String-argument constructor/factory method to deserialize from String value
+('406c3ae8-163a-1026-be42-392265fb1425')
+... (through reference chain: ...["searchTerms"]->...["ProcessorID"])
+```
+
+**Root Cause:**
+Same issue as the date format bug! The `processor_id` was being placed in `searchTerms` as a plain string, but NiFi API expects parameters in the `request` object, NOT in `searchTerms`.
+
+**Flawed Approach (BEFORE):**
+```python
+search_terms = {}
+if processor_id:
+    search_terms["ProcessorID"] = processor_id  # ❌ Wrong location!
+
+if search_terms:
+    query_request["provenance"]["request"]["searchTerms"] = search_terms
+```
+
+**Correct Approach (AFTER):**
+```python
+# Add component ID DIRECTLY to request (NOT in searchTerms!)
+if processor_id:
+    query_request["provenance"]["request"]["componentId"] = processor_id  # ✅ Right location!
+```
+
+**What Changed:**
+- Moved `processor_id` from `searchTerms["ProcessorID"]` to `request["componentId"]`
+- Removed `searchTerms` object entirely (no longer needed)
+- Uses `componentId` (NiFi's field name) instead of `ProcessorID`
+
+**API Structure (Final Working Version):**
+```python
+query_request = {
+    "provenance": {
+        "request": {
+            "maxResults": 100,
+            "startDate": "01/06/2026 01:13:15 UTC",      # ← Direct in request
+            "endDate": "01/06/2026 01:13:15 UTC",        # ← Direct in request
+            "componentId": "406c3ae8-163a-1026-be42..."  # ← Direct in request
+            # NO searchTerms object!
+        }
+    }
+}
+```
+
+**Impact:**
+- Per-processor provenance queries now work correctly
+- All 36 processors can be queried individually
+- Process group filtering is fully functional
+
+---
+
+#### 4. Fixed Date Format Bug in Provenance Query
 **File:** `nifi2py/client.py` (lines 476-481)
 **Commits:** `eb51484`, `5793522`
 

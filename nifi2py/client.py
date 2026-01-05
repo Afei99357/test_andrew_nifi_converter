@@ -475,14 +475,10 @@ class NiFiClient:
         if end_date:
             query_request["provenance"]["request"]["endDate"] = end_date.strftime("%m/%d/%Y %H:%M:%S UTC")
 
-        # Add search terms (WITHOUT dates - only processor_id, etc.)
-        search_terms = {}
+        # Add component ID DIRECTLY to request (NOT in searchTerms!)
+        # NiFi API rejects plain strings in searchTerms
         if processor_id:
-            search_terms["ProcessorID"] = processor_id
-
-        # Only add searchTerms if there are non-date filters
-        if search_terms:
-            query_request["provenance"]["request"]["searchTerms"] = search_terms
+            query_request["provenance"]["request"]["componentId"] = processor_id
 
         # Submit query
         response = self._request("POST", "/provenance", json=query_request)
