@@ -54,7 +54,7 @@ python examples/test_connection_with_group_filter.py
 
 #### 2. Fixed Date Format Bug in Provenance Query
 **File:** `nifi2py/client.py` (lines 476-481)
-**Commit:** `eb51484`
+**Commits:** `eb51484`, `5793522`
 
 **Problem:**
 Provenance queries were failing with 400 error:
@@ -68,26 +68,39 @@ no String-argument constructor/factory method to deserialize from String value
 **Root cause:**
 The client was formatting dates as `MM/DD/YYYY HH:MM:SS` which NiFi's API could not deserialize.
 
+**Fix iteration 1 (Commit `eb51484`):**
+Changed to ISO 8601 format but NiFi still rejected dates with microseconds.
+
+**Fix iteration 2 (Commit `5793522`):**
+Removed microseconds from ISO format - NiFi now accepts it.
+
 **What was changed:**
 ```python
-# BEFORE (BROKEN):
+# ITERATION 1 (BROKEN - MM/DD/YYYY format):
 if start_date:
     search_terms["StartDate"] = start_date.strftime("%m/%d/%Y %H:%M:%S")
 if end_date:
     search_terms["EndDate"] = end_date.strftime("%m/%d/%Y %H:%M:%S")
 
-# AFTER (FIXED):
+# ITERATION 2 (STILL BROKEN - ISO with microseconds):
 if start_date:
-    # Use ISO 8601 format that NiFi can parse
     search_terms["StartDate"] = start_date.isoformat()
 if end_date:
-    # Use ISO 8601 format that NiFi can parse
     search_terms["EndDate"] = end_date.isoformat()
+
+# ITERATION 3 (FIXED - ISO without microseconds):
+if start_date:
+    # Use ISO 8601 format without microseconds (NiFi requirement)
+    search_terms["StartDate"] = start_date.replace(microsecond=0).isoformat()
+if end_date:
+    # Use ISO 8601 format without microseconds (NiFi requirement)
+    search_terms["EndDate"] = end_date.replace(microsecond=0).isoformat()
 ```
 
-**Date format change:**
-- **Old format:** `"01/06/2026 00:53:07"` ❌ NiFi rejects this
-- **New format:** `"2026-01-06T00:53:07"` ✅ ISO 8601 standard
+**Date format evolution:**
+- **Iteration 1:** `"01/06/2026 00:53:07"` ❌ NiFi rejects non-ISO format
+- **Iteration 2:** `"2026-01-06T01:03:20.728000"` ❌ NiFi rejects ISO with microseconds
+- **Iteration 3:** `"2026-01-06T01:03:20"` ✅ ISO 8601 without microseconds - WORKS!
 
 **Why this was needed:**
 - NiFi REST API expects dates in ISO 8601 format or epoch milliseconds
