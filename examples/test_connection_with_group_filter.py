@@ -134,7 +134,16 @@ def main():
 
     all_events = []
     events_per_processor = max_events // len(target_processors) if target_processors else 1000
-    events_per_processor = max(100, events_per_processor)  # At least 100 per processor
+
+    # Enforce minimum 100 events per processor for useful results
+    if events_per_processor < 100:
+        console.print(f"[yellow]Note:[/yellow] max_events ({max_events}) is too small for {len(target_processors)} processors")
+        console.print(f"[yellow]→[/yellow] Using minimum 100 events per processor instead")
+        console.print(f"[yellow]→[/yellow] Will collect ~{100 * len(target_processors)} total events")
+        console.print(f"[cyan]Tip:[/cyan] Set max_events ≥ {100 * len(target_processors)} to avoid this override\n")
+        events_per_processor = 100
+    else:
+        events_per_processor = max(100, events_per_processor)
 
     with Progress(
         SpinnerColumn(),
