@@ -151,7 +151,69 @@ User can now successfully get provenance events from their specific process grou
 
 ---
 
-#### 3. Fixed Date Format Bug in Provenance Query
+#### 3. Fixed ProcessorID in Provenance Query (Per-Processor Filtering)
+**File:** `nifi2py/client.py` (lines 478-481)
+**Branch:** `feature/per-processor-provenance-query`
+**Date:** 2026-01-05
+
+**Problem:**
+When implementing per-processor provenance querying, ALL 36 processors failed with 400 error:
+```
+API request failed: 400 - Cannot construct instance of
+`org.apache.nifi.web.api.dto.provenance.ProvenanceSearchValueDTO`
+no String-argument constructor/factory method to deserialize from String value
+('406c3ae8-163a-1026-be42-392265fb1425')
+... (through reference chain: ...["searchTerms"]->...["ProcessorID"])
+```
+
+**Root Cause:**
+Same issue as the date format bug! The `processor_id` was being placed in `searchTerms` as a plain string, but NiFi API expects parameters in the `request` object, NOT in `searchTerms`.
+
+**Flawed Approach (BEFORE):**
+```python
+search_terms = {}
+if processor_id:
+    search_terms["ProcessorID"] = processor_id  # ❌ Wrong location!
+
+if search_terms:
+    query_request["provenance"]["request"]["searchTerms"] = search_terms
+```
+
+**Correct Approach (AFTER):**
+```python
+# Add component ID DIRECTLY to request (NOT in searchTerms!)
+if processor_id:
+    query_request["provenance"]["request"]["componentId"] = processor_id  # ✅ Right location!
+```
+
+**What Changed:**
+- Moved `processor_id` from `searchTerms["ProcessorID"]` to `request["componentId"]`
+- Removed `searchTerms` object entirely (no longer needed)
+- Uses `componentId` (NiFi's field name) instead of `ProcessorID`
+
+**API Structure (Final Working Version):**
+```python
+query_request = {
+    "provenance": {
+        "request": {
+            "maxResults": 100,
+            "startDate": "01/06/2026 01:13:15 UTC",      # ← Direct in request
+            "endDate": "01/06/2026 01:13:15 UTC",        # ← Direct in request
+            "componentId": "406c3ae8-163a-1026-be42..."  # ← Direct in request
+            # NO searchTerms object!
+        }
+    }
+}
+```
+
+**Impact:**
+- Per-processor provenance queries now work correctly
+- All 36 processors can be queried individually
+- Process group filtering is fully functional
+
+---
+
+#### 4. Fixed Date Format Bug in Provenance Query
 **File:** `nifi2py/client.py` (lines 476-481)
 **Commits:** `eb51484`, `5793522`
 
